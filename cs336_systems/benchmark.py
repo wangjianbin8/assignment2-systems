@@ -1,7 +1,8 @@
-import time
 import sys
+import time
 
 import torch
+import torch.cuda.nvtx as nvtx
 import cs336_basics.model
 
 
@@ -12,7 +13,6 @@ MODEL_CONFIGS = {
         "num_layers": 8,
         "num_heads": 10,
     },
-
     "small": {
         "d_model": 768,
         "d_ff": 3072,
@@ -20,6 +20,7 @@ MODEL_CONFIGS = {
         "num_heads": 12,
     },
 }
+
 
 def print_progress(current, total, stage):
     progress = current / total
@@ -40,16 +41,14 @@ def benchmark_model(
     measure_steps=5,
     use_bf16=False,
 ):
-
     config = MODEL_CONFIGS[model_size]
 
     batch_size = 4
     context_length = 512
     vocab_size = 10000
 
-
     # ----------------------
-    # create model
+    # Create model
     # ----------------------
 
     model = cs336_basics.model.BasicsTransformerLM(
@@ -60,12 +59,11 @@ def benchmark_model(
 
     model.train()
 
-
     optimizer = torch.optim.AdamW(
         model.parameters()
     )
 
-
+    # 随机输入 token
     x = torch.randint(
         0,
         vocab_size,
@@ -73,177 +71,170 @@ def benchmark_model(
         device="cuda",
     )
 
-
-    precision = "BF16" if use_bf16 else "FP32"
+    precision_str = "BF16 Mixed" if use_bf16 else "FP32 Full"
 
     print(
-        f"\nTesting {model_size.upper()} | {precision}"
+        f"\nTesting {model_size.upper()} | Precision: {precision_str}"
     )
 
-
     # ----------------------
-    # warmup
+    # Warmup
     # ----------------------
 
     for i in range(1, warmup_steps + 1):
-
         print_progress(
             i,
             warmup_steps,
-            "Warmup"
+            "Warmup",
         )
 
-
         optimizer.zero_grad()
-
 
         with torch.autocast(
             device_type="cuda",
             dtype=torch.bfloat16,
             enabled=use_bf16,
         ):
-
             output = model(x)
             loss = output.sum()
 
-
         loss.backward()
-
         optimizer.step()
-
 
     torch.cuda.synchronize()
 
     print(" ✔")
 
-
     # ----------------------
-    # measure
+    # Measurement
     # ----------------------
 
     forward_times = []
     backward_times = []
     optimizer_times = []
 
-
     for i in range(1, measure_steps + 1):
-
         print_progress(
             i,
             measure_steps,
-            "Measure"
+            "Measure",
         )
-
 
         optimizer.zero_grad()
 
-
-        # ---- forward ----
+        # ======================
+        # Forward
+        # ======================
 
         torch.cuda.synchronize()
-
         start = time.perf_counter()
 
-
-        with torch.autocast(
-            device_type="cuda",
-            dtype=torch.bfloat16,
-            enabled=use_bf16,
-        ):
-
-            output = model(x)
-            loss = output.sum()
-
+        with nvtx.range("profile_forward"):
+            with torch.autocast(
+                device_type="cuda",
+                dtype=torch.bfloat16,
+                enabled=use_bf16,
+            ):
+                output = model(x)
+                loss = output.sum()
 
         torch.cuda.synchronize()
 
-        forward_times.append(
-            time.perf_counter() - start
-        )
+        forward_time = time.perf_counter() - start
+        forward_times.append(forward_time)
 
-
-        # ---- backward ----
+        # ======================
+        # Backward
+        # ======================
 
         torch.cuda.synchronize()
-
         start = time.perf_counter()
 
-
-        loss.backward()
-
-
-        torch.cuda.synchronize()
-
-        backward_times.append(
-            time.perf_counter() - start
-        )
-
-
-        # ---- optimizer step ----
+        with nvtx.range("backward"):
+            loss.backward()
 
         torch.cuda.synchronize()
 
+        backward_time = time.perf_counter() - start
+        backward_times.append(backward_time)
+
+        # ======================
+        # Optimizer
+        # ======================
+
+        torch.cuda.synchronize()
         start = time.perf_counter()
 
-
-        optimizer.step()
-
+        with nvtx.range("optimizer"):
+            optimizer.step()
 
         torch.cuda.synchronize()
 
-        optimizer_times.append(
-            time.perf_counter() - start
-        )
-
+        optimizer_time = time.perf_counter() - start
+        optimizer_times.append(optimizer_time)
 
     print(" ✔")
 
-
     # ----------------------
-    # result
+    # Results
     # ----------------------
 
-    forward_avg = sum(forward_times) / measure_steps
-    backward_avg = sum(backward_times) / measure_steps
-    optimizer_avg = sum(optimizer_times) / measure_steps
+    forward_avg = sum(forward_times) / len(forward_times)
+    backward_avg = sum(backward_times) / len(backward_times)
+    optimizer_avg = sum(optimizer_times) / len(optimizer_times)
 
+    forward_std = torch.tensor(forward_times).std().item()
+    backward_std = torch.tensor(backward_times).std().item()
+    optimizer_std = torch.tensor(optimizer_times).std().item()
+
+    total_avg = (
+        forward_avg
+        + backward_avg
+        + optimizer_avg
+    )
 
     print(
         f"""
 Results:
 
 Forward:
-    {forward_avg:.6f}s
+    {forward_avg:.6f}s ± {forward_std:.6f}s
 
 Backward:
-    {backward_avg:.6f}s
+    {backward_avg:.6f}s ± {backward_std:.6f}s
 
 Optimizer:
-    {optimizer_avg:.6f}s
+    {optimizer_avg:.6f}s ± {optimizer_std:.6f}s
 
 Total:
-    {forward_avg + backward_avg + optimizer_avg:.6f}s
+    {total_avg:.6f}s
 """
     )
 
 
+# if __name__ == "__main__":
+
+#     print("=== FP32 Benchmark ===")
+
+#     benchmark_model(
+#         model_size="tiny",
+#         warmup_steps=2,
+#         measure_steps=5,
+#         use_bf16=False,
+#     )
+
+#     print("\n=== BF16 Benchmark ===")
+
+#     benchmark_model(
+#         model_size="tiny",
+#         warmup_steps=2,
+#         measure_steps=5,
+#         use_bf16=True,
+#     )
 if __name__ == "__main__":
-
-    print(
-        "=== FP32 Benchmark ==="
-    )
-
     benchmark_model(
-        "tiny",
-        use_bf16=False
-    )
-
-
-    print(
-        "\n=== BF16 Benchmark ==="
-    )
-
-    benchmark_model(
-        "tiny",
-        use_bf16=True
+        model_size="tiny",
+        warmup_steps=2,
+        measure_steps=1,
+        use_bf16=True,
     )
