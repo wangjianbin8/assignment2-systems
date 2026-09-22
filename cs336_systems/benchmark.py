@@ -34,6 +34,50 @@ def print_progress(current, total, stage):
     )
     sys.stdout.flush()
 
+def profile_memory(model, optimizer, x):
+    """
+    记录一次完整 training step 的 GPU 显存变化：
+    forward -> backward -> optimizer step
+    """
+
+    # 开始记录 CUDA 显存的分配/释放历史
+    # max_entries 表示最多记录多少条内存事件
+    torch.cuda.memory._record_memory_history(
+        max_entries=1_000_000
+    )
+
+    # 清空上一轮训练遗留的梯度
+    optimizer.zero_grad()
+
+    # ---------- Forward ----------
+    # 模型根据输入 x 计算输出
+    output = model(x)
+
+    # backward() 需要一个标量目标
+    # 这里不是正式训练，只是为了制造一个可以反向传播的 loss
+    loss = output.sum()
+
+    # ---------- Backward ----------
+    # 计算所有参数的梯度
+    loss.backward()
+
+    # ---------- Optimizer ----------
+    # AdamW 根据刚刚计算出的梯度更新参数
+    optimizer.step()
+
+    # 把刚才记录的显存历史保存到文件
+    # 后面可以用 memory_viz 打开
+    torch.cuda.memory._dump_snapshot(
+        "memory_snapshot.pickle"
+    )
+
+    # 停止记录显存历史
+    torch.cuda.memory._record_memory_history(
+        enabled=None
+    )
+
+    print("Memory snapshot saved to memory_snapshot.pickle")
+
 
 def benchmark_model(
     model_size="tiny",
