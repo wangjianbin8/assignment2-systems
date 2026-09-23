@@ -1,6 +1,6 @@
 import timeit
 import torch
-from cs336_systems.hw1.model import BasicsTransformerLM
+from cs336_basics.model import BasicsTransformerLM
 import statistics
 import argparse
 import torch.cuda.nvtx as nvtx
