@@ -1,5 +1,5 @@
 import torch
-from cs336_basics.model import RMSNorm
+from cs336_systems.hw1.model import RMSNorm
 
 x = torch.randn(2, 4, 8, requires_grad=True)
 norm = RMSNorm(hidden_size=8)
