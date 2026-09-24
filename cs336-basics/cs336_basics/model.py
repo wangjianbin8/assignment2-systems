@@ -424,16 +424,14 @@ def scaled_dot_product_attention(
     """
   
     d_k = K.shape[-1]
-    with nvtx.range("QK matmul"):
-        attention_scores = einsum(Q, K, "... query d_k, ... key d_k -> ... query key") / math.sqrt(d_k)
+    attention_scores = einsum(Q, K, "... query d_k, ... key d_k -> ... query key") / math.sqrt(d_k)
 
     if mask is not None:
         attention_scores = torch.where(mask, attention_scores, float("-inf"))
-    with nvtx.range("softmax"):
-        attention_weights = softmax(attention_scores, dim=-1)  # Softmax over the key dimension
+  
+    attention_weights = softmax(attention_scores, dim=-1)  # Softmax over the key dimension
 
-    with nvtx.range("PV matmul"):
-        out = einsum(attention_weights, V, "... query key, ... key d_v ->  ... query d_v")
+    out = einsum(attention_weights, V, "... query key, ... key d_v ->  ... query d_v")
     return out
 
 
