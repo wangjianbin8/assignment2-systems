@@ -3,7 +3,7 @@ import gc
 import torch
 import triton
 
-from cs336_systems.hw2.flash_forward_triton import FlashAttentionTriton
+from cs336_systems.hw2.flash_triton import FlashAttentionTriton
 # ============================================================
 # 1. Regular PyTorch Attention
 #

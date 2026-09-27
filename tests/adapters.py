@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import torch
 from cs336_systems.hw2.flash_pytorch import FlashAttentionPyTorch
-from cs336_systems.hw2.flash_forward_triton import FlashAttentionTriton
+from cs336_systems.hw2.flash_triton import FlashAttentionTriton
 
 def get_flashattention_autograd_function_pytorch() -> type:
     """
