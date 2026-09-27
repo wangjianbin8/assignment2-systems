@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import torch
-from cs336_systems.hw2.flashattention2_pytorch import FlashAttentionPyTorch
-from cs336_systems.hw2.flashattention2_triton import FlashAttentionTriton
+from cs336_systems.hw2.flashattention2_forward_pytorch import FlashAttentionPyTorch
+from cs336_systems.hw2.flashattention2_forward_triton import FlashAttentionTriton
 
 def get_flashattention_autograd_function_pytorch() -> type:
     """
@@ -17,7 +17,7 @@ def get_flashattention_autograd_function_pytorch() -> type:
     return FlashAttentionPyTorch
 
 def get_flashattention_autograd_function_triton() -> type:
-    """
+    """S
     Returns a torch.autograd.Function subclass that implements FlashAttention2
     using Triton kernels.
     The expectation is that this class will implement the same operations
