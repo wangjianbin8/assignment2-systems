@@ -23,9 +23,15 @@ def flash_backward_pytorch(Q, K, V, O, dO, L, is_causal=False):
         k_indices = torch.arange(N_KEYS, device=Q.device)
 
         causal_mask = (k_indices[None, :] > q_indices[:, None])
-        S += torch.where(causal_mask, -1e6, 0.0)
+        # masked_fill 会保持 S 自己的 dtype
+        S = S.masked_fill(
+            causal_mask,
+            -1e6,
+        )
 
-    P = torch.exp(S - L.unsqueeze(-1))
+    # L 从 Triton forward 中可能是 float32，
+    # 转成与 S 相同的 dtype，避免后续 matmul dtype 不一致。
+    P = torch.exp(S - L.to(S.dtype).unsqueeze(-1))
 
     dV = torch.matmul(P.transpose(-2, -1), dO)
 
