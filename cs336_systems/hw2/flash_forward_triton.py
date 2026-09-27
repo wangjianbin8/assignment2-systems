@@ -3,6 +3,7 @@ import math
 import triton
 import triton.language as tl
 import torch
+from cs336_systems.hw2.flash_backward_pytorch import flash_backward_compiled
 
 @triton.jit
 def flash_fwd_kernel(
@@ -183,6 +184,18 @@ class FlashAttentionTriton(torch.autograd.Function):
         return O
 
     @staticmethod
-    def backward(ctx, grad_output):
-        raise NotImplementedError
+    def backward(ctx, dO):
+        L, Q, K, V, O = ctx.saved_tensors
+
+        is_causal = ctx.is_causal
+
+        dQ, dK, dV = flash_backward_compiled(Q, K, V, O, dO, L, is_causal)
+
+        # forward(ctx, Q, K, V, is_causal=False)
+        #
+        # Q         -> dQ
+        # K         -> dK
+        # V         -> dV
+        # is_causal -> None，因为 bool 不需要梯度
+        return dQ, dK, dV, None
 
