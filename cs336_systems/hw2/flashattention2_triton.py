@@ -92,6 +92,19 @@ def flash_fwd_kernel(
             tl.trans(K_j),
         ) * scale
 
+        # ============================================================
+        # Causal masking
+        #
+        # A query at position q can only attend to keys k <= q.
+        # Therefore, positions satisfying k > q are masked.
+        # ============================================================
+        if is_causal:
+            q_indices = query_tile_index * Q_TILE_SIZE + tl.arange(0, Q_TILE_SIZE)
+            k_indices = k_start + tl.arange(0, K_TILE_SIZE)
+            causal_mask = k_indices[None, :] > q_indices[:, None]
+
+            S_i_j += tl.where(causal_mask, -1e6, 0.0)
+
         tile_max = tl.max(S_i_j, axis=1)
         m_i_new = tl.maximum(m_i, tile_max)
 
