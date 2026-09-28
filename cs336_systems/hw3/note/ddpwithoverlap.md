@@ -2,7 +2,7 @@
 # DDP with Overlapping Individual Parameters 总结
 
 ## Minimal DDP 问题
-- Naive DDP 在 backward 完成后才对所有 parameter.grad 做 all_reduce。
+- Naive DDP 在 `backward 完成后`才对所有 parameter.grad 做 all_reduce。
 - 缺点：
   1. 每个参数单独通信，通信调用次数多。
   2. backward 和通信无法重叠，通信时间完全暴露。
