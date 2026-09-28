@@ -47,7 +47,6 @@ param.register_post_accumulate_grad_hook(hook)
 ```python
 finish_gradient_synchronization()
 ```
-
 内部：
 - `handle.wait()` 等待所有异步通信完成。
 - 将 sum 后的 gradient 除以 `world_size` 得到平均梯度。
@@ -69,4 +68,3 @@ gradient communication
 ```
 
 同时执行，提高 DDP 训练效率。
-```
