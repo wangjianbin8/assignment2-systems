@@ -4,6 +4,7 @@ import torch
 from cs336_systems.hw2.flash_pytorch import FlashAttentionPyTorch
 from cs336_systems.hw2.flash_triton import FlashAttentionTriton
 from cs336_systems.hw3.naive_ddp import NaiveDDP
+from cs336_systems.hw3.ddp_overlap_individual_parameters import DDP
 
 def get_flashattention_autograd_function_pytorch() -> type:
     """
@@ -51,7 +52,7 @@ def get_ddp(module: torch.nn.Module) -> torch.nn.Module:
         Instance of a DDP class.
     """
     # For example: return DDP(module)
-    return NaiveDDP(module)
+    return DDP(module)
 
 
 def ddp_on_after_backward(ddp_model: torch.nn.Module, optimizer: torch.optim.Optimizer):
